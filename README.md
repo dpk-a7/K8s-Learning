@@ -19,6 +19,11 @@
     - Disaster recovery - Backup and restore
     - Hardware resouce management for each pods
 
+# Advantages of K8s compared to others like AWS, Azure services
+- Replication is easier
+- Self-healing of K8s (Recreation of died Pod)
+- Smart scheduling (K8s finds best Node to run the created Pod)
+
 #### Kubernetes Architecture
 
 - **Master Node:**
@@ -97,15 +102,83 @@ We can use this Variables/definitions in app or service file using env variable 
 - Data is not managed by K8s and its owners risk
 
 ## Deployment & Stateful Set
-In practice we use deployments rather pods/replica files
+In practice we use deployments rather pods/replica files.
+For Pods without state, Deployment cant be use.
 > Deployment:\
+    - For stateless Apps\
     - A blueprint to manage Pods and ReplicaSets for scaling and updates. \
     While Service provides networking and load balancing for Pods and is not managed by Deployments\
     - Abstraction of Pods\
 
-For Pods to which Volume is attached, Deployment cant be use.
-Assume DB file used by many POD replicas will endup inconsistant, To fix this issue Stateful Set is used.
+Note: DB can't be replicated via Deployment. DB has state (data), if we have clones/replicas of DB it will perform async operation to Volume attached leading to inconsistancy.
 > Stateful Set:\
-    - To store Credentials, certificates, etc.\
-    - Similar to config map, used to store secret data\
-    - Stored in base64 encode
+    - For stateful Apps/Db\
+    - Manages Pod, replicas scale but ensuring read, write to volume is synchronus.
+
+Since its complex to manage DB in cluster, its recommended to use Hosted DBs like AWS Redshift, or RDS.
+
+## K8s Architecture
+
+**Node process:**
+ - Each Node has multiple Pods on it
+ - 3 Processes must be installed on every Node:
+    - `Container Runtime` (Docker)
+    - `Kubelet`: interacts with container and node
+    - `Kube proxy`: forwards the requests
+-  Communication via Services
+
+**Master process:**
+  - 4 Processes must be installed on every Master Node:
+    - `API server`: User interacts with API server to manage/interact the cluster. (Cluster gateway), It also a FireWall authentication.\
+    Some request -> API Server -> Validation -> Process
+    - `Scheduler`: Creation of pod in a balanced nodes env.\
+    Creating a Pod: Schedule New Pod -> API Server -> Scheduler -> Node(Kubelet) -> Pod
+    - `Controller manager`: It detects cluster state changes (eg. died pod)\
+    Pod Dies -> Controller Manager -> Scheduler -> Node(Kubelet) -> Pod
+    - `ETCD Database`: Key-Value store of cluster state information. Scheduler and Controller Manager use etcd monitor the cluster
+
+In an ideal deplotment, master nodes will have:
+ - load balanced API server
+ - ETCD as distributed storage across all master nodes.
+
+## Disaster recovery:
+ETCD: Snapshots of ETCD is crutial in production, since it stores all the cluster informations, and kubernetes doesn't ensures backup for it.
+
+![alt text](images/image.png)
+
+## MiniKube
+- Creates Master node setup for kubectl
+- Testing purpose
+- creates Virtual Box on your system
+- Node runs in Virtual Box
+- 1 Node K8s cluster
+- Commands:
+ - minikube start
+ - minikube status
+ - minikube stop
+
+## Kubectl
+- Command line tool for K8s cluster 
+- Interacts with the API server of the master node
+
+## Layers of abstraction:
+1) Deployment manages Replicaset
+2) Replicaset manages all the replicas of the Pod
+3) Pod is an abstraction of container
+
+Everything below Deployment is handled by K8s.\
+> Instance naming:`<deployment name>-<replicaset name>-<Pod name>`
+
+
+## Kubectl commands:
+- List pods/deployment/replicaset/services: `kubectl get <pods/deployment/replicaset/services>`
+- Edit deployment configuration: `kubectl edit deployment <deployment name>`
+- Logs: `kubectl logs <pod name>`
+- Description: `kubectl describe <pods/deployment/replicaset/services> <name of pods/deployment/replicaset/services>`
+- Intective Terminal/Login to Pod: `kubectl exec -it <pod name> -- bin/bash`
+- Delete: `kubectl delete <pods/deployment/replicaset/services> <name of pods/deployment/replicaset/services>`
+- create deployment from config yml: `kubectl apply -f <file name.yml>`
+> If the deployment is not created K8s will create it else K8s will update the deployment running
+
+
+# K8s Config file (YAML)
